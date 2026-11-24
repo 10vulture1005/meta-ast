@@ -4,10 +4,12 @@ use crate::model::SourceRange;
 
 /// Severity of a diagnostic.
 ///
-/// Serializes lowercase so the JSON document matches the text rendering:
-/// `warning`/`error`, not `Warning`/`Error`.
+/// The enum serializes with its variant names (`Warning`, `Error`), which is
+/// the shape persisted in the shard records: changing the case here would
+/// break `read_shard` for caches already written, since the shard schema keeps
+/// its variant names while it stays at version 5. Lowercase is a presentation
+/// concern of the diagnostic report only (`interface::report::severity_label`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum Severity {
     Warning,
@@ -148,14 +150,14 @@ mod tests {
     }
 
     #[test]
-    fn severity_serializes_lowercase() {
+    fn severity_serializes_with_variant_names() {
         assert_eq!(
             serde_json::to_string(&Severity::Warning).unwrap(),
-            "\"warning\""
+            "\"Warning\""
         );
         assert_eq!(
             serde_json::to_string(&Severity::Error).unwrap(),
-            "\"error\""
+            "\"Error\""
         );
     }
 

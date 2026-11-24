@@ -120,6 +120,29 @@ fn json_diagnostics_are_the_only_thing_on_stderr() {
     );
 }
 
+/// In JSON mode every failure kind leaves stderr as one JSON document, not
+/// the banner or a plain `error:` line.
+#[test]
+fn json_mode_keeps_stderr_a_single_json_document_on_every_failure_kind() {
+    // An IO failure: the root path does not exist.
+    let out = run(&["graph", "no-such-dir-xyz", "--diagnostics", "json"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "an IO failure must fail the run, stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let value: serde_json::Value = serde_json::from_str(&stderr)
+        .expect("stderr must be one JSON document for every failure kind");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .is_some_and(|message| !message.is_empty()),
+        "the document carries the failure message, stderr: {stderr}"
+    );
+}
+
 /// The deploy command applies the same diagnostic policy as inspect and graph.
 #[cfg(feature = "metacall-deploy")]
 #[test]

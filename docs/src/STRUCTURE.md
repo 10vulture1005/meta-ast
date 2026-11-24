@@ -445,6 +445,8 @@ pub struct Diagnostic {
 
 Diagnostics are accumulated in a `Vec<Diagnostic>` separate from the symbol model. Extraction continues on recoverable errors.
 
+The `--diagnostics json` report renders `severity` as lowercase (`warning`/`error`, via `interface::report::severity_label`) so it matches the text rendering; the persisted shard records keep the `Severity` variant names, so renaming the enum cases would break `read_shard` for caches already written.
+
 ### 6.3 Error Recovery Rules
 
 1. Tree-sitter `ERROR` and `MISSING` nodes are skipped during extraction.

@@ -11,16 +11,7 @@ fn main() -> ExitCode {
     match run(cli, json_diagnostics) {
         Ok(status) => status,
         Err(error) => {
-            // In JSON mode the document itself carries the failure counts and
-            // the exit code, so an extra `error:` line would corrupt the
-            // machine channel on stderr.
-            let tripped_policy = matches!(
-                error.downcast_ref::<meta_ast::Error>(),
-                Some(meta_ast::Error::Diagnostics { .. })
-            );
-            if !(json_diagnostics && tripped_policy) {
-                eprintln!("error: {error:#}");
-            }
+            print_error(&error, json_diagnostics);
             ExitCode::from(exit_status(&error))
         }
     }
@@ -31,6 +22,23 @@ fn exit_status(error: &anyhow::Error) -> u8 {
     match error.downcast_ref::<meta_ast::Error>() {
         Some(meta_ast::Error::Config(_)) => 2,
         _ => 1,
+    }
+}
+
+/// Report a failure on stderr: the `error:` line outside JSON mode, one JSON
+/// error document in JSON mode, where the machine channel must stay clean.
+fn print_error(error: &anyhow::Error, json_diagnostics: bool) {
+    if !json_diagnostics {
+        eprintln!("error: {error:#}");
+        return;
+    }
+    // The tripped-policy failure is already folded into the analysis document.
+    let tripped_policy = matches!(
+        error.downcast_ref::<meta_ast::Error>(),
+        Some(meta_ast::Error::Diagnostics { .. })
+    );
+    if !tripped_policy {
+        meta_ast::interface::report::print_error_json(error);
     }
 }
 

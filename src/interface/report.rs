@@ -71,7 +71,9 @@ pub fn render_text(diagnostic: &Diagnostic) -> String {
     }
 }
 
-fn severity_label(severity: Severity) -> &'static str {
+/// The lowercase severity label used by the text and JSON rendering: the
+/// lowercase form of the [`Severity`] variants.
+pub(crate) fn severity_label(severity: Severity) -> &'static str {
     match severity {
         Severity::Error => "error",
         Severity::Warning => "warning",
@@ -100,7 +102,10 @@ struct JsonSummary {
 #[derive(Debug, serde::Serialize)]
 struct JsonDiagnostic {
     path: String,
-    severity: Severity,
+    /// Lowercase label (`error`/`warning`) so the document matches the text
+    /// rendering; the `Severity` enum itself stays in the variant-name form
+    /// the shard records persist.
+    severity: &'static str,
     message: String,
     source_range: Option<SourceRange>,
 }
@@ -109,7 +114,7 @@ impl JsonDiagnostic {
     fn from_diagnostic(diagnostic: &Diagnostic) -> Self {
         Self {
             path: diagnostic.path.to_string_lossy().into_owned(),
-            severity: diagnostic.severity,
+            severity: severity_label(diagnostic.severity),
             message: diagnostic.message.clone(),
             source_range: diagnostic.source_range.clone(),
         }
@@ -174,6 +179,32 @@ pub fn report_diagnostics_with(
     }
 
     Ok(())
+}
+
+/// Render a failure as the machine-readable document used with
+/// `--diagnostics json`.
+///
+/// The tripped-policy failure is already folded into the analysis document,
+/// so this covers the other failure kinds (invalid path, IO, config, parse).
+/// One JSON document on stderr keeps the machine channel clean for tooling.
+pub fn print_error_json(error: &anyhow::Error) {
+    #[derive(serde::Serialize)]
+    struct ErrorDoc {
+        error: ErrorDetail,
+    }
+
+    #[derive(serde::Serialize)]
+    struct ErrorDetail {
+        message: String,
+    }
+
+    let doc = ErrorDoc {
+        error: ErrorDetail {
+            message: format!("{error:#}"),
+        },
+    };
+    let rendered = serde_json::to_string(&doc).expect("an error document is plain strings");
+    eprintln!("{rendered}");
 }
 
 #[cfg(test)]
